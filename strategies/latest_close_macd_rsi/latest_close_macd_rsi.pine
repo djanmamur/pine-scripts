@@ -1,0 +1,52 @@
+//@version=6
+strategy("MACD + RSI Enhanced Strategy", overlay=true)
+
+// Parameters
+input_body_to_range_threshold = input.float(0.55, title="Full Candle Threshold")
+input_small_wick_threshold = input.float(0.35, title="Small Wick Threshold")
+input_rsi_threshold = input.float(50, title="RSI Threshold")
+input_rsi_period = input.int(14, title="RSI Period")
+
+// MACD Settings
+fast_length = input(12, title="MACD Fast Length")
+slow_length = input(26, title="MACD Slow Length")
+signal_length = input(9, title="MACD Signal Length")
+
+// MACD Calculation
+[macd_line, signal_line, _] = ta.macd(close, fast_length, slow_length, signal_length)
+
+// RSI Calculation
+rsi_value = ta.rsi(close, input_rsi_period)
+
+// Helper Function
+wick_size_validity(candle_close, candle_high, candle_low, is_bullish) =>
+    is_bullish ? (math.abs(candle_close - candle_high) / math.abs(candle_high - candle_low)) <= input_small_wick_threshold : (math.abs(candle_close - candle_low) / math.abs(candle_high - candle_low)) <= input_small_wick_threshold
+
+// Optimized data request
+[latest_open, latest_close, latest_high, latest_low] = request.security(syminfo.tickerid, "15", [open, close, high, low])
+
+if barstate.islastconfirmedhistory
+    candle_body = math.abs(latest_close - latest_open)
+    candle_range = math.abs(latest_high - latest_low)
+    is_full_candle = (candle_body / candle_range) >= input_body_to_range_threshold
+
+    if is_full_candle
+        is_bullish = latest_close > latest_open
+        is_bearish = latest_close < latest_open
+        has_valid_wick = wick_size_validity(latest_close, latest_high, latest_low, is_bullish)
+
+        // Only enter if MACD and RSI confirm
+        macd_is_bullish = macd_line > signal_line
+        macd_is_bearish = macd_line < signal_line
+
+        rsi_is_bullish = rsi_value > input_rsi_threshold
+        rsi_is_bearish = rsi_value < input_rsi_threshold
+
+        if has_valid_wick and is_bullish and macd_is_bullish and rsi_is_bullish
+            strategy.entry("LONG", strategy.long)
+            strategy.exit("Exit LONG", "LONG", stop=latest_low, limit=latest_close + candle_body)
+
+        if has_valid_wick and is_bearish and macd_is_bearish and rsi_is_bearish
+            strategy.entry("SHORT", strategy.short)
+            strategy.exit("Exit SHORT", "SHORT", stop=latest_high, limit=latest_close - candle_body)
+
