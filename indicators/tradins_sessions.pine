@@ -1,0 +1,54 @@
+//@version=6
+indicator("Trading Sessions", overlay=true)
+
+
+plot_box(session_name, session_start, session_end, background_color) =>
+    within_curr_session = (time >= session_start and time <= session_end)
+
+    var float session_high = na
+    var float session_low = na
+
+    var int high_bar = na
+    var int low_bar = na
+
+    if (within_curr_session)
+        if na(session_high) or high > session_high
+            session_high := high
+            high_bar := bar_index
+
+        if na(session_low) or low < session_low
+            session_low := low
+            low_bar := bar_index
+
+
+    if (time >= session_end)
+        if (not na(session_high) and not na(session_low))
+            box.new(left = session_start, right = session_end, top = session_high, bottom = session_low, bgcolor=background_color, xloc = xloc.bar_time, border_width = 0)
+
+            label_x = (session_start + session_end) / 2
+            label_y = session_high + 10
+            label.new(x=label_x, y=label_y, text=session_name, color=color.white, style=label.style_text_outline, textcolor=color.black, size=size.normal, xloc = xloc.bar_time)
+
+        if not na(high_bar)
+            txt = session_name + " High\n" + str.tostring(session_high)
+            label.new(high_bar, session_high, text=txt, color=color.new(color.green, 20), style=label.style_label_down, textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+
+        if not na(low_bar)
+            txt = session_name + " Low\n" + str.tostring(session_low)
+            label.new(low_bar, session_low, text=txt, color=color.new(color.red, 20), style=label.style_label_up, textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+        
+        // Reset the session high and low for the next day
+        session_high := na
+        session_low := na
+        high_bar := na
+        low_bar := na
+
+us_start = timestamp("America/New_York", year, month, dayofmonth, 9, 30)
+us_end = timestamp("America/New_York", year, month, dayofmonth, 16, 00)
+
+london_start = timestamp("Europe/London", year, month, dayofmonth, 8, 00)
+london_end = timestamp("Europe/London", year, month, dayofmonth, 16, 30)
+
+
+plot_box("USA", us_start, us_end, color.new(color.orange, 90))
+plot_box("UK", london_start, london_end, color.rgb(14, 65, 15, 90))
